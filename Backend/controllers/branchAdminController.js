@@ -91,6 +91,9 @@ export const getBranchAdminCounts = async (req, res) => {
             id: branch.industryType._id,
             code: branch.industryType.code,
             name: branch.industryType.name,
+            unitLabel: branch.industryType.unitLabel,
+            staffLabel: branch.industryType.staffLabel,
+            clientLabel: branch.industryType.clientLabel,
           }
         : null,
     });
@@ -256,5 +259,92 @@ export const getBranchAdminOperations = async (req, res) => {
       success: false,
       message: "Server error while fetching branch operations",
     });
+  }
+};
+
+export const createBranchAdminService = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "branch_admin") {
+      return res.status(403).json({ success: false, message: "Only branch admins can create a branch service" });
+    }
+
+    const branchId = req.user.branchId;
+    if (!branchId) {
+      return res.status(403).json({ success: false, message: "Logged in user does not have a branch attached" });
+    }
+
+    const { serviceName, description = "", status = "active" } = req.body;
+    if (!serviceName) {
+      return res.status(400).json({ success: false, message: "serviceName is required" });
+    }
+
+    const branchScopeFilter = {
+      _id: branchId,
+      tenantType: req.user.tenantType || undefined,
+      organizationId: req.user.organizationId || undefined,
+    };
+    Object.keys(branchScopeFilter).forEach(key => branchScopeFilter[key] === undefined && delete branchScopeFilter[key]);
+
+    const branch = await Branch.findOne(branchScopeFilter).populate("industryType");
+    if (!branch) {
+      return res.status(404).json({ success: false, message: "Branch not found in your scope" });
+    }
+
+    const normalizedServiceName = String(serviceName).trim();
+    let service = await Service.findOne({
+      serviceName: { $regex: new RegExp(`^${normalizedServiceName}$`, "i") },
+    });
+
+    let isNewService = false;
+    if (!service) {
+      service = await Service.create({
+        tenantType: branch.tenantType,
+        organizationId: branch.organizationId,
+        industryType: branch.industryType ? branch.industryType._id : null,
+        isDivisionService: false,
+        serviceName: normalizedServiceName,
+        description: String(description).trim(),
+        status: String(status).trim().toLowerCase(),
+        createdBy: req.user.id || req.user._id,
+        branchIds: [branch._id],
+      });
+      isNewService = true;
+    } else {
+      const updatePayload = { $addToSet: { branchIds: branch._id } };
+      if (!service.industryType && branch.industryType) {
+        updatePayload.industryType = branch.industryType._id;
+      }
+      await Service.findByIdAndUpdate(service._id, updatePayload);
+    }
+
+    await Branch.findByIdAndUpdate(branchId, {
+      $addToSet: { services: service._id },
+    });
+
+    return res.status(isNewService ? 201 : 200).json({
+      success: true,
+      message: isNewService ? "Local branch service created successfully" : "Existing service linked to your branch",
+      service: {
+        id: service._id,
+        serviceName: service.serviceName,
+      },
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      const existingService = await Service.findOne({
+        serviceName: { $regex: new RegExp(`^${String(req.body.serviceName).trim()}$`, "i") },
+      });
+      if (existingService) {
+        await Service.findByIdAndUpdate(existingService._id, { $addToSet: { branchIds: req.user.branchId } });
+        await Branch.findByIdAndUpdate(req.user.branchId, { $addToSet: { services: existingService._id } });
+        return res.status(200).json({
+          success: true,
+          message: "Existing service linked on collision retry",
+          service: { id: existingService._id, serviceName: existingService.serviceName }
+        });
+      }
+    }
+    console.error("createBranchAdminService error:", error);
+    return res.status(500).json({ success: false, message: "Server error creating custom service" });
   }
 };

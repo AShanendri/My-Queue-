@@ -20,6 +20,21 @@ const industryTypeSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    unitLabel: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    staffLabel: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    clientLabel: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     status: {
       type: String,
       enum: ["active", "inactive"],

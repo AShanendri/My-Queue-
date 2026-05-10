@@ -30,7 +30,7 @@ export const createIndustryType = async (req, res) => {
       return errorResponse(res, 403, "Only super_admin can create industry types");
     }
 
-    const missingFields = requireFields(req.body, ["name"]);
+    const missingFields = requireFields(req.body, ["name", "unitLabel", "staffLabel", "clientLabel"]);
     if (missingFields.length > 0) {
       return errorResponse(res, 400, `Missing required fields: ${missingFields.join(", ")}`);
     }
@@ -38,6 +38,9 @@ export const createIndustryType = async (req, res) => {
     const name = normalizeText(req.body.name);
     const code = normalizeText(req.body.code || name).toLowerCase().replace(/\s+/g, "_");
     const description = normalizeText(req.body.description || "");
+    const unitLabel = normalizeText(req.body.unitLabel);
+    const staffLabel = normalizeText(req.body.staffLabel);
+    const clientLabel = normalizeText(req.body.clientLabel);
     const status = normalizeText(req.body.status || "active").toLowerCase();
 
     const existing = await IndustryType.findOne({ $or: [{ name }, { code }] }).lean();
@@ -45,7 +48,7 @@ export const createIndustryType = async (req, res) => {
       return errorResponse(res, 409, "Industry type name or code already exists");
     }
 
-    const newIndustryType = await IndustryType.create({ name, code, description, status });
+    const newIndustryType = await IndustryType.create({ name, code, description, unitLabel, staffLabel, clientLabel, status });
     return successResponse(res, 201, "Industry type created successfully", {
       industryType: newIndustryType,
     });

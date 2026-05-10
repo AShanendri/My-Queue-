@@ -113,3 +113,18 @@ export const createBranchCounter = async (payload) => {
     );
   }
 };
+
+export const createBranchAdminService = async (payload) => {
+  try {
+    const response = await api.post("/branch-admin/services", payload);
+    return response.data;
+  } catch (error) {
+    console.error("createBranchAdminService error:", error.response?.data || error.message);
+    throw (
+      error.response?.data || {
+        success: false,
+        message: "Error creating custom service",
+      }
+    );
+  }
+};

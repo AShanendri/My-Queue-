@@ -152,3 +152,18 @@ export const getServicesForTenantSelection = async ({ tenantType, branchId }) =>
       }))
     : [];
 };
+
+export const getIndustryTypes = async () => {
+  const { data } = await client.get("/industryTypes/list");
+
+  return Array.isArray(data?.industryTypes)
+    ? data.industryTypes.map((type) => ({
+        id: type.id || type._id,
+        name: normalize(type.name),
+        code: normalize(type.code),
+        unitLabel: normalize(type.unitLabel),
+        staffLabel: normalize(type.staffLabel),
+        clientLabel: normalize(type.clientLabel),
+      }))
+    : [];
+};

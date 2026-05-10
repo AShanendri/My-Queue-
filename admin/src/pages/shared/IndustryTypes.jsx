@@ -14,6 +14,9 @@ export default function IndustryTypes() {
     name: "",
     code: "",
     description: "",
+    unitLabel: "",
+    staffLabel: "",
+    clientLabel: "",
     status: "active",
   });
 
@@ -53,17 +56,20 @@ export default function IndustryTypes() {
         name: String(formData.name || "").trim(),
         code: String(formData.code || "").trim().toLowerCase(),
         description: String(formData.description || "").trim(),
+        unitLabel: String(formData.unitLabel || "").trim(),
+        staffLabel: String(formData.staffLabel || "").trim(),
+        clientLabel: String(formData.clientLabel || "").trim(),
         status: String(formData.status || "active").trim().toLowerCase(),
       };
 
-      if (!payload.name || !payload.code) {
-        setError("Name and code are required.");
+      if (!payload.name || !payload.code || !payload.unitLabel || !payload.staffLabel || !payload.clientLabel) {
+        setError("Name, code, and all three labels are required.");
         return;
       }
 
       const response = await createIndustryType(payload);
       if (response.success) {
-        setFormData({ name: "", code: "", description: "", status: "active" });
+        setFormData({ name: "", code: "", description: "", unitLabel: "", staffLabel: "", clientLabel: "", status: "active" });
         await loadIndustryTypes();
       } else {
         setError(response.message || "Unable to create industry type.");
@@ -209,6 +215,54 @@ export default function IndustryTypes() {
                 rows={3}
                 className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none focus:ring-4 focus:ring-sky-100"
                 placeholder="Optional description for this industry type"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="unitLabel" className="mb-2 block text-sm font-medium text-slate-700">
+                Unit Label <span className="text-red-600">*</span>
+              </label>
+              <input
+                id="unitLabel"
+                name="unitLabel"
+                type="text"
+                value={formData.unitLabel}
+                onChange={handleChange}
+                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none focus:ring-4 focus:ring-sky-100"
+                placeholder="e.g. Counters, Wards"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="staffLabel" className="mb-2 block text-sm font-medium text-slate-700">
+                Staff Label <span className="text-red-600">*</span>
+              </label>
+              <input
+                id="staffLabel"
+                name="staffLabel"
+                type="text"
+                value={formData.staffLabel}
+                onChange={handleChange}
+                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none focus:ring-4 focus:ring-sky-100"
+                placeholder="e.g. Tellers, Doctors"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="clientLabel" className="mb-2 block text-sm font-medium text-slate-700">
+                Client Label <span className="text-red-600">*</span>
+              </label>
+              <input
+                id="clientLabel"
+                name="clientLabel"
+                type="text"
+                value={formData.clientLabel}
+                onChange={handleChange}
+                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none focus:ring-4 focus:ring-sky-100"
+                placeholder="e.g. Customers, Patients"
+                required
               />
             </div>
 

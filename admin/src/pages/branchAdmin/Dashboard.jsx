@@ -14,7 +14,10 @@ export default function BranchAdminDashboard() {
   });
 
   const industrialCode = counts.industryType?.code || tenantType || "hospital";
-  const labels = labelMap[industrialCode] || labelMap.hospital;
+  const defaultLabels = labelMap[industrialCode] || labelMap.hospital;
+
+  const staffLabel = counts.industryType?.staffLabel || defaultLabels.staff;
+  const unitLabel = counts.industryType?.unitLabel || defaultLabels.unit;
 
   useEffect(() => {
     const loadCounts = async () => {
@@ -40,7 +43,7 @@ export default function BranchAdminDashboard() {
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-medium text-gray-600">{labels.staff}</p>
+            <p className="text-sm font-medium text-gray-600">{staffLabel}</p>
             <p className="mt-2 text-3xl font-bold text-gray-900">{counts.staff}</p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
@@ -52,7 +55,7 @@ export default function BranchAdminDashboard() {
             <p className="mt-2 text-3xl font-bold text-gray-900">{counts.tokens}</p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-medium text-gray-600">{labels.unit}</p>
+            <p className="text-sm font-medium text-gray-600">{unitLabel}</p>
             <p className="mt-2 text-3xl font-bold text-gray-900">{counts.tasks}</p>
           </div>
         </div>

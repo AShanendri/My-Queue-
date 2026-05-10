@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createBranchCounter, getBranchAdminOperationsDashboard } from "../../services/branchAdminService";
+import { createBranchCounter, getBranchAdminOperationsDashboard, createBranchAdminService } from "../../services/branchAdminService";
 
 const formatStatusLabel = (status = "") => {
   const normalized = String(status || "").trim().toLowerCase();
@@ -53,6 +53,10 @@ export default function BranchAdminOperations() {
   const [error, setError] = useState("");
   const [openCounterFormServiceId, setOpenCounterFormServiceId] = useState("");
   const [counterForms, setCounterForms] = useState({});
+  const [newServiceName, setNewServiceName] = useState("");
+  const [creatingService, setCreatingService] = useState(false);
+  const [serviceError, setServiceError] = useState("");
+  const [serviceSuccess, setServiceSuccess] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -216,6 +220,31 @@ export default function BranchAdminOperations() {
     }
   };
 
+  const handleCreateService = async () => {
+    if (!newServiceName.trim()) {
+      setServiceError("Service name is required");
+      return;
+    }
+    try {
+      setCreatingService(true);
+      setServiceError("");
+      setServiceSuccess("");
+      const response = await createBranchAdminService({ serviceName: newServiceName.trim() });
+      if (response && response.success) {
+        setServiceSuccess("Service created successfully!");
+        setNewServiceName("");
+        const data = await getBranchAdminOperationsDashboard();
+        setDashboard(data || null);
+      } else {
+        setServiceError(response.message || "Failed to create service");
+      }
+    } catch (err) {
+      setServiceError(err?.message || "Failed to create service");
+    } finally {
+      setCreatingService(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -237,7 +266,28 @@ export default function BranchAdminOperations() {
 
       {!loading && !error && (
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900">Services</h2>
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <h2 className="text-xl font-semibold text-slate-900">Services</h2>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="New Custom Service"
+                value={newServiceName}
+                onChange={(e) => setNewServiceName(e.target.value)}
+                className="rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 outline-none focus:ring-4 focus:ring-sky-100"
+              />
+              <button
+                type="button"
+                onClick={handleCreateService}
+                disabled={creatingService}
+                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+              >
+                {creatingService ? "Adding..." : "+ Add"}
+              </button>
+            </div>
+          </div>
+          {serviceError && <p className="text-sm text-red-600 mb-2">{serviceError}</p>}
+          {serviceSuccess && <p className="text-sm text-emerald-600 mb-2">{serviceSuccess}</p>}
 
           {services.length === 0 ? (
             <p className="mt-4 text-sm text-slate-500">No services found for this branch</p>
