@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import Branch from "../models/Branch.js";
+import Ward from "../models/Ward.js";
 import IndustryType from "../models/IndustryType.js";
 import User from "../models/User.js";
 import {
@@ -610,3 +611,74 @@ export const createHospitalBranch = async (req, res) => createBranch(req, res);
 export const createCompanyBranch = async (req, res) => createBranch(req, res);
 
 export const listBranches = async (req, res) => getBranches(req, res);
+
+export const createWard = async (req, res) => {
+  try {
+    if (!req.user || !isSuperAdmin(req.user)) {
+      return errorResponse(res, 403, "Only super_admin can create wards");
+    }
+
+    const { branchId } = req.params;
+    if (!isValidObjectId(branchId)) {
+      return errorResponse(res, 400, "Invalid branch id");
+    }
+
+    const missingFields = requireFields(req.body, ["name"]);
+    if (missingFields.length > 0) {
+      return errorResponse(res, 400, `Missing required fields: ${missingFields.join(", ")}`);
+    }
+
+    const branch = await Branch.findById(branchId).lean();
+    if (!branch) {
+      return errorResponse(res, 404, "Branch not found");
+    }
+
+    const name = normalizeText(req.body.name);
+    const description = normalizeText(req.body.description || "");
+    const status = normalizeText(req.body.status || "active").toLowerCase();
+
+    const ward = await Ward.create({
+      branchId,
+      name,
+      description,
+      status,
+      createdBy: req.user?.email || null,
+    });
+
+    return successResponse(res, 201, "Ward created successfully", { ward });
+  } catch (error) {
+    console.error("createWard error:", error);
+    return errorResponse(res, 500, "Server error while creating ward", {
+      error: error?.message || error,
+    });
+  }
+};
+
+export const getWardsByBranch = async (req, res) => {
+  try {
+    const { branchId } = req.params;
+    if (!isValidObjectId(branchId)) {
+      return errorResponse(res, 400, "Invalid branch id");
+    }
+
+    const branch = await Branch.findById(branchId).lean();
+    if (!branch) {
+      return errorResponse(res, 404, "Branch not found");
+    }
+
+    const wards = await Ward.find({ branchId, status: "active" })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return successResponse(res, 200, "Wards fetched successfully", {
+      count: wards.length,
+      wards,
+    });
+  } catch (error) {
+    console.error("getWardsByBranch error:", error);
+    return errorResponse(res, 500, "Server error while fetching wards", {
+      error: error?.message || error,
+    });
+  }
+};
+

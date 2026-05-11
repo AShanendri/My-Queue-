@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 
 const formatStatusLabel = (status) =>
   status.charAt(0).toUpperCase() + status.slice(1);
@@ -22,6 +23,7 @@ const normalizeBranch = (branch) => ({
 const ITEMS_PER_PAGE = 5;
 
 function BranchTable({ title, addLabel, onAdd, data }) {
+  const { role } = useAuth();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(1);
@@ -52,12 +54,14 @@ function BranchTable({ title, addLabel, onAdd, data }) {
       <div className="flex flex-col gap-4 mb-4">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-semibold">{title}</h2>
-          <button
-            onClick={onAdd}
-            className="bg-sky-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-sky-700"
-          >
-            {addLabel}
-          </button>
+          {role === 'organization_admin' && (
+            <button
+              onClick={onAdd}
+              className="bg-sky-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-sky-700"
+            >
+              {addLabel}
+            </button>
+          )}
         </div>
 
         {/* Search + Filter */}
@@ -147,6 +151,7 @@ function BranchTable({ title, addLabel, onAdd, data }) {
 
 export default function CompanySuperAdminBranches() {
   const navigate = useNavigate();
+  const { role } = useAuth();
   const [bankBranches, setBankBranches] = useState([]);
   const [supermarketBranches, setSupermarketBranches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -196,12 +201,14 @@ export default function CompanySuperAdminBranches() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Branch Management</h1>
-        <button
-          onClick={() => navigate("/company-super-admin/add-branch")}
-          className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-green-700"
-        >
-          Add New Branch
-        </button>
+        {role === 'organization_admin' && (
+          <button
+            onClick={() => navigate("/company-super-admin/add-branch")}
+            className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-green-700"
+          >
+            Add New Branch
+          </button>
+        )}
       </div>
 
       {error && (

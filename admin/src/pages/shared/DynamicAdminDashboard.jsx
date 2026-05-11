@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { labelMap } from "../../utils/industryLabels";
+import api from "../../services/api";
 
 const dashboardConfig = {
   hospital: {
@@ -8,208 +10,354 @@ const dashboardConfig = {
     subtitle: "Manage hospitals, branches, and healthcare services",
     organizationLabel: labelMap.hospital.unit,
     branchLabel: "Registered Hospitals",
-    serviceLabel: "Active Services",
+    wardLabel: "Ward/Department",
     adminLabel: labelMap.hospital.staff,
-    activityLabel: "Recent Hospital Branch Activity",
   },
   police: {
     title: "Police Admin Dashboard",
     subtitle: "Manage stations, divisions, and law enforcement services",
     organizationLabel: labelMap.police.unit,
     branchLabel: "Active Stations",
-    serviceLabel: "Active Patrol Services",
+    wardLabel: "Ward/Section",
     adminLabel: labelMap.police.staff,
-    activityLabel: "Recent Station Activity",
   },
   bank: {
     title: "Bank Admin Dashboard",
     subtitle: "Manage bank branches, products, and customer services",
     organizationLabel: labelMap.bank.unit,
     branchLabel: "Open Branches",
-    serviceLabel: "Active Banking Services",
+    wardLabel: "Ward/Counter",
     adminLabel: labelMap.bank.staff,
-    activityLabel: "Recent Branch Operations",
   },
   supermarket: {
     title: "Retail Admin Dashboard",
     subtitle: "Manage stores, inventory, and retail operations",
     organizationLabel: labelMap.supermarket.unit,
     branchLabel: "Open Stores",
-    serviceLabel: "Active Retail Services",
+    wardLabel: "Ward/Counter",
     adminLabel: labelMap.supermarket.staff,
-    activityLabel: "Recent Store Activity",
   },
   company: {
     title: "Company Admin Dashboard",
     subtitle: "Manage company units, branches, and organizational operations",
     organizationLabel: labelMap.company.unit,
     branchLabel: "Active Branches",
-    serviceLabel: "Active Services",
+    wardLabel: "Ward/Counter",
     adminLabel: labelMap.company.staff,
-    activityLabel: "Recent Branch Activity",
   },
   default: {
     title: "Admin Dashboard",
     subtitle: "Manage your organization and services",
     organizationLabel: labelMap.default.unit,
     branchLabel: "Branches",
-    serviceLabel: "Services",
+    wardLabel: "Wards",
     adminLabel: labelMap.default.staff,
-    activityLabel: "Recent Activity",
-  },
-};
-
-const dummyData = {
-  hospital: {
-    organizations: 3,
-    branches: 12,
-    services: 18,
-    admins: 7,
-    activity: [
-      { id: "h1", name: "City General - Main", location: "Colombo", status: "active" },
-      { id: "h2", name: "Metro Care - Central", location: "Galle", status: "active" },
-      { id: "h3", name: "Lakeside - East", location: "Kurunegala", status: "inactive" },
-    ],
-  },
-  police: {
-    organizations: 2,
-    branches: 10,
-    services: 14,
-    admins: 8,
-    activity: [
-      { id: "p1", name: "Colombo Central Station", location: "Colombo", status: "active" },
-      { id: "p2", name: "Kandy Division", location: "Kandy", status: "active" },
-      { id: "p3", name: "Galle Patrol Unit", location: "Galle", status: "inactive" },
-    ],
-  },
-  bank: {
-    organizations: 2,
-    branches: 15,
-    services: 12,
-    admins: 6,
-    activity: [
-      { id: "b1", name: "City Bank - Main", location: "Colombo", status: "active" },
-      { id: "b2", name: "North Bank Branch", location: "Kandy", status: "active" },
-      { id: "b3", name: "Garden Finance Center", location: "Galle", status: "inactive" },
-    ],
-  },
-  supermarket: {
-    organizations: 2,
-    branches: 13,
-    services: 11,
-    admins: 5,
-    activity: [
-      { id: "s1", name: "SuperMart City", location: "Colombo", status: "active" },
-      { id: "s2", name: "Mart Express Kandy", location: "Kandy", status: "active" },
-      { id: "s3", name: "FreshMarket Galle", location: "Galle", status: "inactive" },
-    ],
-  },
-  company: {
-    organizations: 4,
-    branches: 11,
-    services: 13,
-    admins: 7,
-    activity: [
-      { id: "c1", name: "Company HQ - Colombo", location: "Colombo", status: "active" },
-      { id: "c2", name: "West Region Branch", location: "Kurunegala", status: "active" },
-      { id: "c3", name: "East Region Unit", location: "Galle", status: "inactive" },
-    ],
-  },
-  default: {
-    organizations: 2,
-    branches: 6,
-    services: 8,
-    admins: 4,
-    activity: [
-      { id: "d1", name: "Head Office", location: "Colombo", status: "active" },
-      { id: "d2", name: "Regional Center", location: "Kandy", status: "active" },
-      { id: "d3", name: "Support Unit", location: "Galle", status: "inactive" },
-    ],
   },
 };
 
 const formatStatusLabel = (status) => status.charAt(0).toUpperCase() + status.slice(1);
 
+// Data table component
+function DataTable({ title, data, columns, onDelete, onAddNew, loading, error }) {
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 5;
+  const totalPages = Math.ceil(data.length / itemsPerPage);
+  const paginatedData = data.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        <button
+          onClick={onAddNew}
+          className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition"
+        >
+          + Add New
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-8 text-gray-500">Loading...</div>
+      ) : error ? (
+        <div className="text-center py-8 text-red-600">{error}</div>
+      ) : data.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">No items found</div>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  {columns.map((col) => (
+                    <th key={col.key} className="px-4 py-3 font-semibold text-gray-900">
+                      {col.label}
+                    </th>
+                  ))}
+                  <th className="px-4 py-3 font-semibold text-gray-900">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedData.map((item) => (
+                  <tr key={item.id || item._id} className="border-b border-gray-200 hover:bg-gray-50">
+                    {columns.map((col) => (
+                      <td key={col.key} className="px-4 py-3 text-gray-600">
+                        {col.render ? col.render(item) : item[col.key] || "-"}
+                      </td>
+                    ))}
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => onDelete(item.id || item._id)}
+                        className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200 transition"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center mt-4">
+              <button
+                disabled={page === 1}
+                onClick={() => setPage(p => p - 1)}
+                className="px-3 py-1 border rounded disabled:opacity-50"
+              >
+                Prev
+              </button>
+              <span className="text-sm text-gray-600">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                disabled={page === totalPages}
+                onClick={() => setPage(p => p + 1)}
+                className="px-3 py-1 border rounded disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function DynamicAdminDashboard() {
+  const navigate = useNavigate();
   const { user, role, tenantType, industryType } = useAuth();
+  const [industries, setIndustries] = useState([]);
+  const [organizations, setOrganizations] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [wards, setWards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errors, setErrors] = useState({});
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const normalizedIndustryType = useMemo(() => {
     return String(industryType || tenantType || "default").toLowerCase();
   }, [industryType, tenantType]);
 
   const config = dashboardConfig[normalizedIndustryType] || dashboardConfig.default;
-  const data = dummyData[normalizedIndustryType] || dummyData.default;
+
+  // Fetch all data
+  useEffect(() => {
+    const fetchAllData = async () => {
+      setLoading(true);
+      try {
+        // Fetch industries
+        try {
+          const indResponse = await api.get("/industry-types");
+          setIndustries(Array.isArray(indResponse.data) ? indResponse.data : indResponse.data?.industryTypes || []);
+        } catch (err) {
+          console.error("Error fetching industries:", err);
+          setIndustries([]);
+        }
+
+        // Fetch organizations
+        try {
+          const orgResponse = await api.get(`/organizations?tenantType=${normalizedIndustryType}`);
+          setOrganizations(Array.isArray(orgResponse.data) ? orgResponse.data : orgResponse.data?.data || []);
+        } catch (err) {
+          console.error("Error fetching organizations:", err);
+          setOrganizations([]);
+        }
+
+        // Fetch branches
+        try {
+          const branchResponse = await api.get(`/branches?tenantType=${normalizedIndustryType}`);
+          setBranches(Array.isArray(branchResponse.data) ? branchResponse.data : branchResponse.data?.data || []);
+        } catch (err) {
+          console.error("Error fetching branches:", err);
+          setBranches([]);
+        }
+
+        // Fetch wards
+        try {
+          const wardResponse = await api.get("/wards");
+          setWards(Array.isArray(wardResponse.data) ? wardResponse.data : wardResponse.data?.data || []);
+        } catch (err) {
+          console.error("Error fetching wards:", err);
+          setWards([]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllData();
+  }, [normalizedIndustryType, refreshKey]);
+
+  // Delete handlers
+  const handleDeleteIndustry = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this industry?")) return;
+    try {
+      await api.delete(`/industry-types/${id}`);
+      setRefreshKey(k => k + 1);
+    } catch (err) {
+      setErrors(e => ({ ...e, industry: err.response?.data?.message || "Failed to delete" }));
+    }
+  };
+
+  const handleDeleteOrganization = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this organization?")) return;
+    try {
+      await api.delete(`/organizations/${id}`);
+      setRefreshKey(k => k + 1);
+    } catch (err) {
+      setErrors(e => ({ ...e, organization: err.response?.data?.message || "Failed to delete" }));
+    }
+  };
+
+  const handleDeleteBranch = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this branch?")) return;
+    try {
+      await api.delete(`/branches/${id}`);
+      setRefreshKey(k => k + 1);
+    } catch (err) {
+      setErrors(e => ({ ...e, branch: err.response?.data?.message || "Failed to delete" }));
+    }
+  };
+
+  const handleDeleteWard = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this ward?")) return;
+    try {
+      await api.delete(`/wards/${id}`);
+      setRefreshKey(k => k + 1);
+    } catch (err) {
+      setErrors(e => ({ ...e, ward: err.response?.data?.message || "Failed to delete" }));
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-12">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-7xl">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900">{config.title}</h1>
           <p className="mt-2 text-gray-600">{config.subtitle}</p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4 mb-8">
+          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-medium text-gray-600">Industries</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">{industries.length}</p>
+          </div>
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <p className="text-sm font-medium text-gray-600">{config.organizationLabel}</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">{data.organizations}</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">{organizations.length}</p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <p className="text-sm font-medium text-gray-600">{config.branchLabel}</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">{data.branches}</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">{branches.length}</p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-medium text-gray-600">{config.serviceLabel}</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">{data.services}</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-medium text-gray-600">{config.adminLabel}</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">{data.admins}</p>
+            <p className="text-sm font-medium text-gray-600">{config.wardLabel}</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">{wards.length}</p>
           </div>
         </div>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900">{config.activityLabel}</h2>
-            <div className="mt-4 space-y-3">
-              {data.activity.map((item) => (
-                <div key={item.id} className="flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{item.name}</p>
-                    <p className="text-xs text-gray-500">{item.location}</p>
-                  </div>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                      item.status === "active"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-amber-100 text-amber-700"
-                    }`}
-                  >
-                    {formatStatusLabel(item.status)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Data Tables */}
+        <div className="space-y-8">
+          <DataTable
+            title="Industries"
+            data={industries}
+            columns={[
+              { key: "name", label: "Name" },
+              { key: "code", label: "Code" },
+              { key: "status", label: "Status", render: (item) => formatStatusLabel(item.status || "active") },
+            ]}
+            onDelete={handleDeleteIndustry}
+            onAddNew={() => navigate("/admin/industry-types")}
+            loading={loading}
+            error={errors.industry}
+          />
 
-          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900">Identity & Access</h2>
-            <div className="mt-4 space-y-3 text-sm text-gray-600">
-              <div>
-                <p className="font-semibold text-gray-900">Logged in as</p>
-                <p>{user?.email || "Unknown user"}</p>
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900">Role</p>
-                <p>{role || "Super Admin"}</p>
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900">Industry</p>
-                <p>{normalizedIndustryType}</p>
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900">Tenant Type</p>
-                <p>{tenantType || "Not set"}</p>
-              </div>
+          <DataTable
+            title={config.organizationLabel}
+            data={organizations}
+            columns={[
+              { key: "organizationName", label: "Name" },
+              { key: "address", label: "Location" },
+              { key: "status", label: "Status", render: (item) => formatStatusLabel(item.status || "active") },
+            ]}
+            onDelete={handleDeleteOrganization}
+            onAddNew={() => navigate(`/${normalizedIndustryType}-super-admin/organizations`)}
+            loading={loading}
+            error={errors.organization}
+          />
+
+          <DataTable
+            title={config.branchLabel}
+            data={branches}
+            columns={[
+              { key: "branchName", label: "Name" },
+              { key: "branchCode", label: "Code" },
+              { key: "city", label: "Location" },
+              { key: "status", label: "Status", render: (item) => formatStatusLabel(item.status || "active") },
+            ]}
+            onDelete={handleDeleteBranch}
+            onAddNew={() => navigate(`/${normalizedIndustryType}-super-admin/branches`)}
+            loading={loading}
+            error={errors.branch}
+          />
+
+          <DataTable
+            title={config.wardLabel}
+            data={wards}
+            columns={[
+              { key: "name", label: "Name" },
+              { key: "branchCode", label: "Branch" },
+              { key: "status", label: "Status", render: (item) => formatStatusLabel(item.status || "active") },
+            ]}
+            onDelete={handleDeleteWard}
+            onAddNew={() => alert("Ward management coming soon")}
+            loading={loading}
+            error={errors.ward}
+          />
+        </div>
+
+        {/* User Info */}
+        <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Identity & Access</h2>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="font-semibold text-gray-900">Logged in as</p>
+              <p className="text-gray-600">{user?.email || "Unknown user"}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900">Role</p>
+              <p className="text-gray-600">{role || "Super Admin"}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900">Industry Type</p>
+              <p className="text-gray-600">{normalizedIndustryType}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900">Tenant Type</p>
+              <p className="text-gray-600">{tenantType || "Not set"}</p>
             </div>
           </div>
         </div>

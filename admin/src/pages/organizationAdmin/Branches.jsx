@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getBranches } from "../../services/branchService";
 import { getMyBranchRequests } from "../../services/branchRequestService";
+import api from "../../services/api";
 
 // Shared organization-admin page for tenant-scoped branch management.
 export default function SharedOrganizationAdminBranches() {
@@ -12,6 +13,12 @@ export default function SharedOrganizationAdminBranches() {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedBranchId, setSelectedBranchId] = useState(null);
+  const [wards, setWards] = useState([]);
+  const [wardLoading, setWardLoading] = useState(false);
+  const [wardError, setWardError] = useState(null);
+  const [wardFormData, setWardFormData] = useState({ name: "", description: "" });
+  const [savingWard, setSavingWard] = useState(false);
 
   useEffect(() => {
     const loadBranches = async () => {
@@ -52,6 +59,48 @@ export default function SharedOrganizationAdminBranches() {
 
   const handleAddBranch = () => {
     navigate("/organization-admin/add-branch");
+  };
+
+  const handleSelectBranch = async (branchId) => {
+    setSelectedBranchId(branchId);
+    setWardLoading(true);
+    setWardError(null);
+    
+    try {
+      const { data } = await api.get(`/branches/${branchId}/wards`);
+      setWards(Array.isArray(data?.wards) ? data.wards : []);
+    } catch (err) {
+      setWardError(err?.response?.data?.message || "Failed to load wards");
+      setWards([]);
+    } finally {
+      setWardLoading(false);
+    }
+  };
+
+  const handleAddWard = async () => {
+    if (!wardFormData.name.trim() || !selectedBranchId) {
+      setWardError("Ward name is required");
+      return;
+    }
+
+    setSavingWard(true);
+    setWardError(null);
+
+    try {
+      const { data } = await api.post(`/branches/${selectedBranchId}/wards`, {
+        name: wardFormData.name.trim(),
+        description: wardFormData.description.trim(),
+      });
+
+      if (data?.ward) {
+        setWards([...wards, data.ward]);
+        setWardFormData({ name: "", description: "" });
+      }
+    } catch (err) {
+      setWardError(err?.response?.data?.message || "Failed to create ward");
+    } finally {
+      setSavingWard(false);
+    }
   };
 
   const formatStatusLabel = (status) => status?.charAt(0).toUpperCase() + status?.slice(1);
@@ -110,6 +159,7 @@ export default function SharedOrganizationAdminBranches() {
                   <th className="px-4 py-3 text-left font-semibold text-slate-900">Industry Type</th>
                   <th className="px-4 py-3 text-left font-semibold text-slate-900">Status</th>
                   <th className="px-4 py-3 text-left font-semibold text-slate-900">Contact</th>
+                  <th className="px-4 py-3 text-right font-semibold text-slate-900">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -135,11 +185,95 @@ export default function SharedOrganizationAdminBranches() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{branch.contactNumber || "—"}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleSelectBranch(branch.id)}
+                        className={`inline-flex items-center justify-center rounded-lg px-3 py-1 text-xs font-semibold transition ${
+                          selectedBranchId === branch.id
+                            ? "bg-sky-600 text-white"
+                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                        }`}
+                      >
+                        {selectedBranchId === branch.id ? "Selected" : "Select"}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        </section>
+      )}
+
+      {selectedBranchId && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-slate-900">
+              Add Ward/Counter to {branches.find((b) => b.id === selectedBranchId)?.branchName}
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">Create and manage wards/counters for this branch</p>
+          </div>
+
+          {wardError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4">
+              <p className="text-sm text-red-700">{wardError}</p>
+            </div>
+          )}
+
+          <div className="mb-6 space-y-4 rounded-lg bg-slate-50 p-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-900">Ward Name *</label>
+              <input
+                type="text"
+                value={wardFormData.name}
+                onChange={(e) => setWardFormData({ ...wardFormData, name: e.target.value })}
+                placeholder="Enter ward name (e.g., Emergency, OPD, ICU)"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm placeholder-slate-400 focus:border-sky-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-900">Description</label>
+              <textarea
+                value={wardFormData.description}
+                onChange={(e) => setWardFormData({ ...wardFormData, description: e.target.value })}
+                placeholder="Enter ward description (optional)"
+                rows="2"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm placeholder-slate-400 focus:border-sky-500 focus:outline-none"
+              />
+            </div>
+            <button
+              onClick={handleAddWard}
+              disabled={savingWard}
+              className="inline-flex items-center justify-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-50"
+            >
+              {savingWard ? "Adding Ward..." : "+ Add Ward"}
+            </button>
+          </div>
+
+          {wardLoading && (
+            <div className="text-center text-slate-500">Loading wards...</div>
+          )}
+
+          {!wardLoading && wards.length === 0 && !wardError && (
+            <div className="text-center text-slate-500">No wards yet. Create one above.</div>
+          )}
+
+          {!wardLoading && wards.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-slate-900">Existing Wards</h3>
+              {wards.map((ward) => (
+                <div key={ward.id} className="flex items-start justify-between rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div>
+                    <p className="font-medium text-slate-900">{ward.name}</p>
+                    {ward.description && <p className="text-sm text-slate-600">{ward.description}</p>}
+                  </div>
+                  <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
+                    {ward.status || "active"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 

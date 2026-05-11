@@ -167,3 +167,26 @@ export const getIndustryTypes = async () => {
       }))
     : [];
 };
+
+export const getWardsForBranch = async (branchId) => {
+  const normalizedBranchId = normalize(branchId);
+
+  if (!normalizedBranchId) {
+    return [];
+  }
+
+  try {
+    const { data } = await client.get(`/branches/${normalizedBranchId}/wards`);
+
+    return Array.isArray(data?.wards)
+      ? data.wards.map((ward) => ({
+          id: ward.id || ward._id,
+          name: normalize(ward.name),
+          description: normalize(ward.description),
+        }))
+      : [];
+  } catch (error) {
+    console.error("Failed to fetch wards for branch:", error);
+    return [];
+  }
+};

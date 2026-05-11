@@ -131,6 +131,7 @@ export const getRoleSidebarLinks = (role, tenantType) => {
     ],
     [CANONICAL_ROLES.ORGANIZATION_ADMIN]: [
       { label: "Dashboard", to: "/admin/dashboard" },
+      { label: "Branches", to: "/organization-admin/branches" },
     ],
     [CANONICAL_ROLES.BRANCH_ADMIN]: [
       { label: "Dashboard", to: "/branch-admin/dashboard" },

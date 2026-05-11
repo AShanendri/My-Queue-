@@ -244,8 +244,14 @@ export default function Login({ loginType = LOGIN_TYPES.DEFAULT }) {
         status: user.status,
       });
 
-      // redirect
-      navigate(getDefaultDashboardPath(user.role), { replace: true });
+      // redirect based on role
+      if (['police_super_admin', 'hospital_super_admin', 'company_super_admin'].includes(user.role)) {
+        navigate('/admin/industry-types', { replace: true });
+      } else if (user.role === 'organization_admin') {
+        navigate('/organization-admin/branches', { replace: true });
+      } else {
+        navigate(getDefaultDashboardPath(user.role), { replace: true });
+      }
 
     } catch (error) {
       console.error(error);

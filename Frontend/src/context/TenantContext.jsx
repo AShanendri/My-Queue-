@@ -1,21 +1,24 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import { tenantConfig } from "../configs/tenantConfig.js";
 import { legacyStorageKeys, readJSON, readValue, removeItem, storageKeys, writeJSON, writeValue } from "../utils/storage";
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
+// eslint-disable-next-line react-refresh/only-export-components
 export const TenantContext = createContext();
 
 export const TenantProvider = ({ tenantType, children }) => {
   const tenant = useMemo(() => tenantConfig[tenantType], [tenantType]);
   const theme = tenant?.theme;
 
-  const selectedOrganizationIdKey = `queueflow_${tenantType}_selectedOrganization_id`;
+  const selectedOrganizationIdKey = useMemo(() => `queueflow_${tenantType}_selectedOrganization_id`, [tenantType]);
 
-  const readSelectedOrganization = () =>
-    readValue(localStorage, storageKeys.selectedOrganization(tenantType), [legacyStorageKeys.selectedOrganization]) || "";
+  const readSelectedOrganization = useCallback(() =>
+    readValue(localStorage, storageKeys.selectedOrganization(tenantType), [legacyStorageKeys.selectedOrganization]) || "", [tenantType]);
 
-  const readSelectedOrganizationId = () => localStorage.getItem(selectedOrganizationIdKey) || "";
+  const readSelectedOrganizationId = useCallback(() => localStorage.getItem(selectedOrganizationIdKey) || "", [selectedOrganizationIdKey]);
 
-  const readSelectedBranch = () => {
+  const readSelectedBranch = useCallback(() => {
     const savedTenant = readValue(localStorage, storageKeys.selectedTenant(tenantType), [legacyStorageKeys.selectedTenant]);
     const savedBranchObject = readJSON(localStorage, storageKeys.selectedBranch(tenantType), [], null);
 
@@ -33,9 +36,9 @@ export const TenantProvider = ({ tenantType, children }) => {
     }
 
     return null;
-  };
+  }, [tenantType]);
 
-  const readSelectedService = () => {
+  const readSelectedService = useCallback(() => {
     const savedTenant = readValue(localStorage, storageKeys.selectedTenant(tenantType), [legacyStorageKeys.selectedTenant]);
     const savedServiceObject = readJSON(localStorage, storageKeys.selectedService(tenantType), [], null);
 
@@ -53,32 +56,35 @@ export const TenantProvider = ({ tenantType, children }) => {
     }
 
     return null;
-  };
+  }, [tenantType]);
 
-  const [selectedBranch, setSelectedBranchState] = useState(() => {
-    return readSelectedBranch();
-  });
-
+  const [selectedBranch, setSelectedBranchState] = useState(() => readSelectedBranch());
   const [selectedService, setSelectedServiceState] = useState(() => readSelectedService());
   const [selectedOrganization, setSelectedOrganizationState] = useState(() => readSelectedOrganization());
   const [selectedOrganizationId, setSelectedOrganizationIdState] = useState(() => readSelectedOrganizationId());
 
+  // Update state when tenantType changes
   useEffect(() => {
-    setSelectedBranchState(readSelectedBranch());
-    setSelectedServiceState(readSelectedService());
-    setSelectedOrganizationState(readSelectedOrganization());
-    setSelectedOrganizationIdState(localStorage.getItem(selectedOrganizationIdKey) || "");
-  }, [tenantType]);
+    const newBranch = readSelectedBranch();
+    const newService = readSelectedService();
+    const newOrganization = readSelectedOrganization();
+    const newOrganizationId = readSelectedOrganizationId();
+
+    setSelectedBranchState(newBranch);
+    setSelectedServiceState(newService);
+    setSelectedOrganizationState(newOrganization);
+    setSelectedOrganizationIdState(newOrganizationId);
+  }, [tenantType, readSelectedBranch, readSelectedService, readSelectedOrganization, readSelectedOrganizationId]);
 
 
 
-  const setSelectedOrganization = (organizationName, organizationId = "") => {
+const setSelectedOrganization = useCallback((organizationName, organizationId = "") => {
     const normalizedName = String(organizationName || "").trim();
     const normalizedId = String(organizationId || "").trim();
 
     const pathParts = window.location.pathname.split('/');
     const tenantFromUrl = pathParts[1];
-    
+
 
     const activeTenant = tenantType || tenantFromUrl;
 
@@ -97,11 +103,11 @@ export const TenantProvider = ({ tenantType, children }) => {
     localStorage.setItem(orgNameKey, normalizedName);
     localStorage.setItem(orgIdKey, normalizedId);
     localStorage.setItem(`queueflow_selectedTenant`, activeTenant);
-    
-    console.log(`Saved for ${activeTenant}:`, normalizedId);
-  };
 
-  const setSelectedBranch = (branch) => {
+    console.log(`Saved for ${activeTenant}:`, normalizedId);
+  }, [tenantType]);
+
+  const setSelectedBranch = useCallback((branch) => {
     setSelectedBranchState(branch);
 
     if (branch) {
@@ -111,9 +117,9 @@ export const TenantProvider = ({ tenantType, children }) => {
     }
 
     writeValue(localStorage, storageKeys.selectedTenant(tenantType), tenantType);
-  };
+  }, [tenantType]);
 
-  const setSelectedService = (service) => {
+  const setSelectedService = useCallback((service) => {
     setSelectedServiceState(service);
 
     if (service) {
@@ -123,9 +129,9 @@ export const TenantProvider = ({ tenantType, children }) => {
     }
 
     writeValue(localStorage, storageKeys.selectedTenant(tenantType), tenantType);
-  };
+  }, [tenantType]);
 
-  const clearSelection = () => {
+  const clearSelection = useCallback(() => {
     setSelectedBranchState(null);
     setSelectedServiceState(null);
     setSelectedOrganizationState("");
@@ -138,7 +144,7 @@ export const TenantProvider = ({ tenantType, children }) => {
     removeItem(localStorage, legacyStorageKeys.selectedOrganization);
     removeItem(localStorage, legacyStorageKeys.selectedBranch);
     removeItem(localStorage, legacyStorageKeys.selectedService);
-  };
+  }, [tenantType, selectedOrganizationIdKey]);
 
   const value = useMemo(
     () => ({
@@ -162,10 +168,15 @@ export const TenantProvider = ({ tenantType, children }) => {
       selectedOrganizationId,
       selectedBranch,
       selectedService,
+      setSelectedOrganization,
+      setSelectedBranch,
+      setSelectedService,
+      clearSelection,
     ]
   );
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTenant = () => useContext(TenantContext);

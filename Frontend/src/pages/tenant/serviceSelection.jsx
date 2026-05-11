@@ -1,83 +1,77 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import PageHeader from "../../components/common/PageHeader";
 import ServiceCard from "../../components/tenant/ServiceCard";
 import { useTenant } from "../../context/TenantContext";
-// Home Page එකේ පාවිච්චි කරපු generic service එක මෙතනටත් ගන්නවා
-import { getServicesForOrganization } from "../../services/tenantSelectionService";
+import { getWardsForBranch } from "../../services/tenantSelectionService";
 
 export default function ServiceSelection() {
   const {
     tenantType,
     tenant,
     theme,
-    selectedOrganizationId,
     selectedService,
     setSelectedService,
   } = useTenant();
   
   const navigate = useNavigate();
+  const location = useLocation();
+  const branchId = location.state?.branchId || "";
+  
   const [searchTerm, setSearchTerm] = useState("");
-  const [services, setServices] = useState([]);
-  const [loadingServices, setLoadingServices] = useState(true);
+  const [wards, setWards] = useState([]);
+  const [loadingWards, setLoadingWards] = useState(true);
   const [fetchError, setFetchError] = useState("");
-
-  // Storage එකෙන් ID එක fallback එකක් විදිහට ගන්නවා
-  const effectiveOrgId = useMemo(() => {
-    return selectedOrganizationId || localStorage.getItem(`queueflow_${tenantType}_selectedOrganization_id`) || "";
-  }, [selectedOrganizationId, tenantType]);
 
   useEffect(() => {
     let isMounted = true;
 
-    const loadAllOrgServices = async () => {
-      if (!effectiveOrgId || !tenantType) {
-        setServices([]);
-        setLoadingServices(false);
+    const loadWardsForBranch = async () => {
+      if (!branchId || !tenantType) {
+        setWards([]);
+        setLoadingWards(false);
         return;
       }
 
       try {
-        setLoadingServices(true);
+        setLoadingWards(true);
         setFetchError("");
 
-        // මෙතනදී අපි මුළු Organization එකටම අදාළ services fetch කරනවා
-        const response = await getServicesForOrganization(tenantType, effectiveOrgId);
+        const response = await getWardsForBranch(branchId);
 
         if (!isMounted) return;
 
-        // response එක array එකක් බව තහවුරු කරගන්නවා
-        setServices(Array.isArray(response) ? response : []);
+        setWards(Array.isArray(response) ? response : []);
       } catch (error) {
         if (!isMounted) return;
-        setFetchError(error?.response?.data?.message || error?.message || "Failed to load services");
-        setServices([]);
+        setFetchError(error?.response?.data?.message || error?.message || "Failed to load wards");
+        setWards([]);
       } finally {
         if (isMounted) {
-          setLoadingServices(false);
+          setLoadingWards(false);
         }
       }
     };
 
-    loadAllOrgServices();
+    loadWardsForBranch();
 
     return () => {
       isMounted = false;
     };
-  }, [tenantType, effectiveOrgId]);
+  }, [tenantType, branchId]);
 
   // Filtering logic
-  const filteredServices = useMemo(() => {
+  const filteredWards = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return services
-      .filter((s) => term === "" || s.serviceName.toLowerCase().includes(term))
-      .sort((a, b) => a.serviceName.localeCompare(b.serviceName));
-  }, [services, searchTerm]);
+    return wards
+      .filter((w) => term === "" || w.name.toLowerCase().includes(term))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [wards, searchTerm]);
 
-  const activeSelectedService = useMemo(() => {
+  const activeSelectedWard = useMemo(() => {
     if (!selectedService?.id) return null;
-    return services.find((s) => String(s.id) === String(selectedService.id)) || null;
-  }, [services, selectedService]);
+    return wards.find((w) => String(w.id) === String(selectedService.id)) || null;
+  }, [wards, selectedService]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -85,48 +79,53 @@ export default function ServiceSelection() {
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <PageHeader
-            title={tenant.labels?.serviceSelectionTitle || "Available Services"}
-            description={tenant.labels?.serviceSelectionDescription || "All services offered by this organization across all branches."}
+            title={tenant.labels?.wardSelectionTitle || "Available Wards/Counters"}
+            description={tenant.labels?.wardSelectionDescription || "Select a ward or counter to get your token."}
           />
           <div className="w-full lg:w-72">
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder={tenant.labels?.serviceSearchPlaceholder || "Search services..."}
+              placeholder={tenant.labels?.wardSearchPlaceholder || "Search wards..."}
               className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition focus:ring-4 ${theme?.border} ${theme?.ring}`}
             />
           </div>
         </div>
       </div>
 
-      {/* Services Grid */}
+      {/* Wards Grid */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {filteredServices.map((service) => (
+        {filteredWards.map((ward) => (
           <ServiceCard
-            key={service.id || service.serviceName}
-            service={service.serviceName}
-            selected={activeSelectedService?.id === service.id}
-            onSelect={() => setSelectedService(service)}
+            key={ward.id || ward.name}
+            service={ward.name}
+            selected={activeSelectedWard?.id === ward.id}
+            onSelect={() => setSelectedService({ id: ward.id, serviceName: ward.name })}
             theme={theme}
           />
         ))}
       </div>
 
       {/* States */}
-      {loadingServices && <div className="text-center p-10">Loading all services...</div>}
-      {!loadingServices && filteredServices.length === 0 && (
+      {loadingWards && <div className="text-center p-10">Loading wards...</div>}
+      {!loadingWards && fetchError && (
+        <div className="text-center p-10 text-red-600 border border-red-200 bg-red-50 rounded-2xl">
+          {fetchError}
+        </div>
+      )}
+      {!loadingWards && filteredWards.length === 0 && !fetchError && (
         <div className="text-center p-10 text-slate-500 border border-dashed rounded-2xl">
-          No services found for this organization.
+          No wards found for this branch.
         </div>
       )}
 
       {/* Continue Action */}
-      {activeSelectedService && (
+      {activeSelectedWard && (
         <div className={`rounded-3xl border p-5 flex justify-between items-center ${theme?.border} ${theme?.light}`}>
           <div>
-            <p className="text-xs font-bold uppercase text-slate-500">Selected Service</p>
-            <p className="text-lg font-semibold">{activeSelectedService.serviceName}</p>
+            <p className="text-xs font-bold uppercase text-slate-500">Selected Ward</p>
+            <p className="text-lg font-semibold">{activeSelectedWard.name}</p>
           </div>
           <button
             onClick={() => navigate(`/${tenantType}/book-token`)}

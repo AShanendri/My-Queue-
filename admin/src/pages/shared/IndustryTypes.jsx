@@ -18,6 +18,8 @@ export default function IndustryTypes() {
     staffLabel: "",
     clientLabel: "",
     status: "active",
+    adminEmail: "",
+    adminPassword: "",
   });
 
   const loadIndustryTypes = async () => {
@@ -60,16 +62,18 @@ export default function IndustryTypes() {
         staffLabel: String(formData.staffLabel || "").trim(),
         clientLabel: String(formData.clientLabel || "").trim(),
         status: String(formData.status || "active").trim().toLowerCase(),
+        adminEmail: String(formData.adminEmail || "").trim().toLowerCase(),
+        adminPassword: String(formData.adminPassword || "").trim(),
       };
 
-      if (!payload.name || !payload.code || !payload.unitLabel || !payload.staffLabel || !payload.clientLabel) {
-        setError("Name, code, and all three labels are required.");
+      if (!payload.name || !payload.code || !payload.unitLabel || !payload.staffLabel || !payload.clientLabel || !payload.adminEmail || !payload.adminPassword) {
+        setError("Name, code, all three labels, admin email, and admin password are required.");
         return;
       }
 
       const response = await createIndustryType(payload);
       if (response.success) {
-        setFormData({ name: "", code: "", description: "", unitLabel: "", staffLabel: "", clientLabel: "", status: "active" });
+        setFormData({ name: "", code: "", description: "", unitLabel: "", staffLabel: "", clientLabel: "", status: "active", adminEmail: "", adminPassword: "" });
         await loadIndustryTypes();
       } else {
         setError(response.message || "Unable to create industry type.");
@@ -280,6 +284,38 @@ export default function IndustryTypes() {
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
+            </div>
+
+            <div>
+              <label htmlFor="adminEmail" className="mb-2 block text-sm font-medium text-slate-700">
+                Admin Email <span className="text-red-600">*</span>
+              </label>
+              <input
+                id="adminEmail"
+                name="adminEmail"
+                type="email"
+                value={formData.adminEmail}
+                onChange={handleChange}
+                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none focus:ring-4 focus:ring-sky-100"
+                placeholder="e.g. admin@hospital.com"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="adminPassword" className="mb-2 block text-sm font-medium text-slate-700">
+                Admin Password <span className="text-red-600">*</span>
+              </label>
+              <input
+                id="adminPassword"
+                name="adminPassword"
+                type="password"
+                value={formData.adminPassword}
+                onChange={handleChange}
+                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none focus:ring-4 focus:ring-sky-100"
+                placeholder="Enter a secure password"
+                required
+              />
             </div>
 
             <div className="flex justify-end">

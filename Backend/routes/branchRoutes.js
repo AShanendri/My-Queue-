@@ -9,6 +9,8 @@ import {
 	getPublicBranches,
 	getBranches,
 	updateBranch,
+	createWard,
+	getWardsByBranch,
 } from "../controllers/branchController.js";
 
 const branchRouter = express.Router();
@@ -23,5 +25,9 @@ branchRouter.patch("/:id", authMiddleware, updateBranch);
 // Legacy aliases kept for migration safety.
 branchRouter.post("/hospital", authMiddleware, createHospitalBranch);
 branchRouter.post("/company", authMiddleware, createCompanyBranch);
+
+// Ward endpoints
+branchRouter.post("/:branchId/wards", authMiddleware, createWard);
+branchRouter.get("/:branchId/wards", getWardsByBranch);
 
 export default branchRouter;

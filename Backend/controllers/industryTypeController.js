@@ -1,5 +1,7 @@
 import Branch from "../models/Branch.js";
 import IndustryType from "../models/IndustryType.js";
+import User from "../models/User.js";
+import bcrypt from "bcryptjs";
 import { errorResponse, successResponse } from "../utils/responseHelpers.js";
 import { isSuperAdmin } from "../utils/scopeHelpers.js";
 import { isValidObjectId, requireFields } from "../utils/validationHelpers.js";
@@ -30,7 +32,7 @@ export const createIndustryType = async (req, res) => {
       return errorResponse(res, 403, "Only super_admin can create industry types");
     }
 
-    const missingFields = requireFields(req.body, ["name", "unitLabel", "staffLabel", "clientLabel"]);
+    const missingFields = requireFields(req.body, ["name", "unitLabel", "staffLabel", "clientLabel", "adminEmail", "adminPassword"]);
     if (missingFields.length > 0) {
       return errorResponse(res, 400, `Missing required fields: ${missingFields.join(", ")}`);
     }
@@ -42,13 +44,33 @@ export const createIndustryType = async (req, res) => {
     const staffLabel = normalizeText(req.body.staffLabel);
     const clientLabel = normalizeText(req.body.clientLabel);
     const status = normalizeText(req.body.status || "active").toLowerCase();
+    const adminEmail = normalizeText(req.body.adminEmail).toLowerCase();
+    const adminPassword = normalizeText(req.body.adminPassword);
 
     const existing = await IndustryType.findOne({ $or: [{ name }, { code }] }).lean();
     if (existing) {
       return errorResponse(res, 409, "Industry type name or code already exists");
     }
 
+    const existingUser = await User.findOne({ email: adminEmail }).lean();
+    if (existingUser) {
+      return errorResponse(res, 409, "Admin email already exists");
+    }
+
     const newIndustryType = await IndustryType.create({ name, code, description, unitLabel, staffLabel, clientLabel, status });
+
+    // Create admin user
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    const adminName = `Admin (${name})`; // e.g. Admin (Hospital)
+    await User.create({
+      name: adminName,
+      email: adminEmail,
+      password: hashedPassword,
+      role: "organization_admin",
+      tenantType: code,
+      status: "active",
+    });
+
     return successResponse(res, 201, "Industry type created successfully", {
       industryType: newIndustryType,
     });
