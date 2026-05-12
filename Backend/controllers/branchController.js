@@ -9,6 +9,7 @@ import {
   isBranchAdmin,
   isOrganizationAdmin,
   isSuperAdmin,
+  isStaff,
   normalizeTenantType,
 } from "../utils/scopeHelpers.js";
 import { errorResponse, successResponse } from "../utils/responseHelpers.js";
@@ -450,6 +451,59 @@ export const getPublicBranches = async (req, res) => {
 
 export const getBranchesByOrganization = async (req, res) => getPublicBranches(req, res);
 
+export const getWards = async (req, res) => {
+  try {
+    if (!req.user) {
+      return errorResponse(res, 401, "User authentication required");
+    }
+
+    const tenantType = normalizeTenantType(req.query?.tenantType || req.user?.tenantType);
+    const branchQuery = {};
+
+    if (isSuperAdmin(req.user)) {
+      if (tenantType) {
+        branchQuery.tenantType = tenantType;
+      }
+    } else if (isOrganizationAdmin(req.user)) {
+      const scope = getOrganizationScope(req.user);
+      if (!scope.organizationId) {
+        return errorResponse(res, 403, "You are not allowed to list wards");
+      }
+      branchQuery.organizationId = scope.organizationId;
+      if (tenantType) {
+        branchQuery.tenantType = tenantType;
+      }
+    } else if (isBranchAdmin(req.user) || isStaff(req.user)) {
+      if (!req.user?.branchId) {
+        return errorResponse(res, 403, "You are not allowed to list wards");
+      }
+      branchQuery._id = req.user.branchId;
+      if (tenantType) {
+        branchQuery.tenantType = tenantType;
+      }
+    } else {
+      return errorResponse(res, 403, "You are not allowed to list wards");
+    }
+
+    const branches = await Branch.find(branchQuery).select("_id branchName").lean();
+    const branchIds = branches.map((branch) => branch._id);
+
+    const wards = await Ward.find({ branchId: { $in: branchIds }, status: "active" })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return successResponse(res, 200, "Wards fetched successfully", {
+      count: wards.length,
+      wards,
+    });
+  } catch (error) {
+    console.error("getWards error:", error);
+    return errorResponse(res, 500, "Server error while fetching wards", {
+      error: error?.message || error,
+    });
+  }
+};
+
 export const getBranchById = async (req, res) => {
   try {
     if (!req.user) {
@@ -614,8 +668,8 @@ export const listBranches = async (req, res) => getBranches(req, res);
 
 export const createWard = async (req, res) => {
   try {
-    if (!req.user || !isSuperAdmin(req.user)) {
-      return errorResponse(res, 403, "Only super_admin can create wards");
+    if (!req.user || (!isSuperAdmin(req.user) && !isOrganizationAdmin(req.user) && !isBranchAdmin(req.user))) {
+      return errorResponse(res, 403, "Only super_admin, organization_admin, or branch_admin can create wards");
     }
 
     const { branchId } = req.params;
@@ -631,6 +685,10 @@ export const createWard = async (req, res) => {
     const branch = await Branch.findById(branchId).lean();
     if (!branch) {
       return errorResponse(res, 404, "Branch not found");
+    }
+
+    if (!hasBranchAccess(req.user, branch)) {
+      return errorResponse(res, 403, "You are not allowed to create wards for this branch");
     }
 
     const name = normalizeText(req.body.name);
@@ -656,6 +714,10 @@ export const createWard = async (req, res) => {
 
 export const getWardsByBranch = async (req, res) => {
   try {
+    if (!req.user) {
+      return errorResponse(res, 401, "User authentication required");
+    }
+
     const { branchId } = req.params;
     if (!isValidObjectId(branchId)) {
       return errorResponse(res, 400, "Invalid branch id");
@@ -664,6 +726,10 @@ export const getWardsByBranch = async (req, res) => {
     const branch = await Branch.findById(branchId).lean();
     if (!branch) {
       return errorResponse(res, 404, "Branch not found");
+    }
+
+    if (!hasBranchAccess(req.user, branch)) {
+      return errorResponse(res, 403, "You are not allowed to access wards for this branch");
     }
 
     const wards = await Ward.find({ branchId, status: "active" })
@@ -677,6 +743,74 @@ export const getWardsByBranch = async (req, res) => {
   } catch (error) {
     console.error("getWardsByBranch error:", error);
     return errorResponse(res, 500, "Server error while fetching wards", {
+      error: error?.message || error,
+    });
+  }
+};
+
+/** Customer-facing read-only wards/counters (no auth). */
+export const getPublicWardsByBranch = async (req, res) => {
+  try {
+    const { branchId } = req.params;
+    if (!isValidObjectId(branchId)) {
+      return errorResponse(res, 400, "Invalid branch id");
+    }
+
+    const branch = await Branch.findById(branchId).lean();
+    if (!branch) {
+      return errorResponse(res, 404, "Branch not found");
+    }
+
+    if (String(branch.status || "").toLowerCase() !== "active") {
+      return errorResponse(res, 404, "Branch not found");
+    }
+
+    const wards = await Ward.find({ branchId, status: "active" })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return successResponse(res, 200, "Wards fetched successfully", {
+      count: wards.length,
+      wards,
+    });
+  } catch (error) {
+    console.error("getPublicWardsByBranch error:", error);
+    return errorResponse(res, 500, "Server error while fetching wards", {
+      error: error?.message || error,
+    });
+  }
+};
+
+export const deleteWard = async (req, res) => {
+  try {
+    if (!req.user) {
+      return errorResponse(res, 401, "User authentication required");
+    }
+
+    const { id } = req.params;
+    if (!isValidObjectId(id)) {
+      return errorResponse(res, 400, "Invalid ward id");
+    }
+
+    const ward = await Ward.findById(id).lean();
+    if (!ward) {
+      return errorResponse(res, 404, "Ward not found");
+    }
+
+    const branch = await Branch.findById(ward.branchId).lean();
+    if (!branch) {
+      return errorResponse(res, 404, "Branch not found for this ward");
+    }
+
+    if (!hasBranchAccess(req.user, branch)) {
+      return errorResponse(res, 403, "You are not allowed to delete this ward");
+    }
+
+    await Ward.deleteOne({ _id: id });
+    return successResponse(res, 200, "Ward deleted successfully", { id });
+  } catch (error) {
+    console.error("deleteWard error:", error);
+    return errorResponse(res, 500, "Server error while deleting ward", {
       error: error?.message || error,
     });
   }

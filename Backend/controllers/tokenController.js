@@ -7,6 +7,7 @@ import WorkSession from "../models/WorkSession.js";
 import { buildTokenPrefix, formatSequenceNumber } from "../utils/generateToken.js";
 import { normalizeTenantType } from "../utils/scopeHelpers.js";
 import Counter from "../models/Counter.js";
+import Ward from "../models/Ward.js";
 
 
 const normalize = (value = "") => String(value || "").trim();
@@ -87,6 +88,7 @@ const buildTokenResponse = (token) => ({
   organizationId: token.organizationId || null,
   branchId: token.branchId || null,
   serviceId: token.serviceId || null,
+  wardId: token.wardId || null,
   organizationName: token.organizationName || "",
   branchName: token.branchName || "",
   serviceName: token.serviceName || "",
@@ -107,7 +109,7 @@ const buildTokenResponse = (token) => ({
   updatedAt: token.updatedAt,
 });
 
-// create token
+// create token (supports anonymous customers; use wardId for ward/counter queues or serviceId for service-linked queues)
 export const createToken = async (req, res) => {
   try {
     const {
@@ -116,23 +118,52 @@ export const createToken = async (req, res) => {
       organizationId,
       branchId,
       serviceId,
+      wardId,
       fullName,
       mobile,
       note,
-      userId,
+      userId: bodyUserId,
     } = req.body || {};
 
-    if (!branchId || !serviceId || !fullName || !mobile) {
+    if (!branchId || !fullName || !mobile) {
       return res.status(400).json({
         success: false,
-        message: "branchId, serviceId, fullName, and mobile are required.",
+        message: "branchId, fullName, and mobile are required.",
       });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(branchId) || !mongoose.Types.ObjectId.isValid(serviceId)) {
+    if (!serviceId && !wardId) {
       return res.status(400).json({
         success: false,
-        message: "branchId and serviceId must be valid ObjectIds.",
+        message: "Either serviceId or wardId is required.",
+      });
+    }
+
+    if (serviceId && wardId) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide either serviceId or wardId, not both.",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(branchId)) {
+      return res.status(400).json({
+        success: false,
+        message: "branchId must be a valid ObjectId.",
+      });
+    }
+
+    if (serviceId && !mongoose.Types.ObjectId.isValid(serviceId)) {
+      return res.status(400).json({
+        success: false,
+        message: "serviceId must be a valid ObjectId.",
+      });
+    }
+
+    if (wardId && !mongoose.Types.ObjectId.isValid(wardId)) {
+      return res.status(400).json({
+        success: false,
+        message: "wardId must be a valid ObjectId.",
       });
     }
 
@@ -143,20 +174,73 @@ export const createToken = async (req, res) => {
       });
     }
 
-    const [branch, service] = await Promise.all([
-      Branch.findById(branchId)
-        .select("_id tenantType branchName city organizationId organizationName divisionId divisionName status")
-        .lean(),
-      Service.findById(serviceId)
-        .select("_id tenantType organizationId divisionId branchId serviceName status")
-        .lean(),
-    ]);
+    const branch = await Branch.findById(branchId)
+      .select("_id tenantType branchName city organizationId organizationName divisionId divisionName status")
+      .lean();
 
     if (!branch) {
       return res.status(404).json({
         success: false,
         message: "Branch not found",
       });
+    }
+
+    let service = null;
+    let ward = null;
+
+    if (wardId) {
+      ward = await Ward.findById(wardId).lean();
+      if (!ward) {
+        return res.status(404).json({
+          success: false,
+          message: "Ward not found",
+        });
+      }
+      if (String(ward.branchId) !== String(branch._id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Ward does not belong to the selected branch",
+        });
+      }
+      if (String(ward.status || "").toLowerCase() !== "active") {
+        return res.status(400).json({
+          success: false,
+          message: "Selected ward is not active",
+        });
+      }
+    } else {
+      service = await Service.findById(serviceId)
+        .select("_id tenantType organizationId divisionId branchIds serviceName status")
+        .lean();
+
+      if (!service) {
+        return res.status(404).json({
+          success: false,
+          message: "Service not found",
+        });
+      }
+
+      const linkedBranches = Array.isArray(service.branchIds) ? service.branchIds.map(String) : [];
+      if (!linkedBranches.includes(String(branch._id))) {
+        return res.status(400).json({
+          success: false,
+          message: "Service is not offered at the selected branch",
+        });
+      }
+
+      if (normalizeTenantType(service.tenantType) !== normalizeTenantType(branch.tenantType)) {
+        return res.status(400).json({
+          success: false,
+          message: "Service does not belong to the branch tenant type",
+        });
+      }
+
+      if (String(service.status || "").toLowerCase() !== "active") {
+        return res.status(400).json({
+          success: false,
+          message: "Selected service is not active",
+        });
+      }
     }
 
     const resolvedTenantType = normalizeTenantType(tenantType || req.user?.tenantType || branch.tenantType || "");
@@ -174,31 +258,10 @@ export const createToken = async (req, res) => {
       });
     }
 
-    if (!service) {
-      return res.status(404).json({
-        success: false,
-        message: "Service not found",
-      });
-    }
-
-    /*if (String(service.branchId) !== String(branch._id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Service does not belong to the selected branch",
-      });
-    }*/
-
-    if (normalizeTenantType(service.tenantType) !== resolvedTenantType) {
+    if (service && normalizeTenantType(service.tenantType) !== resolvedTenantType) {
       return res.status(400).json({
         success: false,
         message: "Service does not belong to the provided tenantType",
-      });
-    }
-
-    if (String(service.status || "").toLowerCase() !== "active") {
-      return res.status(400).json({
-        success: false,
-        message: "Selected service is not active",
       });
     }
 
@@ -222,7 +285,7 @@ export const createToken = async (req, res) => {
       organizationScope.organizationName || branch.organizationName || branch.divisionName || organization || ""
     );
     const finalBranchName = normalize(branch.branchName);
-    const finalServiceName = normalize(service.serviceName);
+    const finalServiceName = ward ? normalize(ward.name) : normalize(service.serviceName);
 
     if (!finalOrganizationId && resolvedTenantType === "police") {
       return res.status(400).json({
@@ -242,23 +305,35 @@ export const createToken = async (req, res) => {
       });
     }
 
+    const prefixServiceId = ward ? ward._id : service._id;
     const tokenPrefix = buildTokenPrefix({
       tenantType: resolvedTenantType,
       organization: finalOrganizationName,
       city: branch.city,
       service: finalServiceName,
-      serviceId: service._id,
+      serviceId: prefixServiceId,
     });
 
-    const tokenQuery = buildLegacyCompatibleScopeQuery({
-      tenantType: resolvedTenantType,
-      organizationId: finalOrganizationId,
-      organizationName: finalOrganizationName,
-      branchId: branch._id,
-      branchName: finalBranchName,
-      serviceId: service._id,
-      serviceName: finalServiceName,
-    });
+    const tokenQuery = ward
+      ? {
+          tenantType: resolvedTenantType,
+          branchId: branch._id,
+          wardId: ward._id,
+        }
+      : buildLegacyCompatibleScopeQuery({
+          tenantType: resolvedTenantType,
+          organizationId: finalOrganizationId,
+          organizationName: finalOrganizationName,
+          branchId: branch._id,
+          branchName: finalBranchName,
+          serviceId: service._id,
+          serviceName: finalServiceName,
+        });
+
+    const resolvedUserId =
+      bodyUserId && mongoose.Types.ObjectId.isValid(bodyUserId)
+        ? bodyUserId
+        : req.user?.id || req.user?._id || null;
 
     let createdToken = null;
 
@@ -267,29 +342,28 @@ export const createToken = async (req, res) => {
       const sequenceNumber = existingCount + 1;
       const tokenNumber = `${tokenPrefix}-${formatSequenceNumber(sequenceNumber)}`;
 
-      // Calculate peopleAhead as the count of currently waiting tokens for this branch & service
-      const peopleAhead = await Token.countDocuments({
-        branchId: branch._id,
-        serviceId: service._id,
-        status: "Waiting",
-      });
+      const queueWaitFilter = ward
+        ? { branchId: branch._id, wardId: ward._id, status: "Waiting" }
+        : { branchId: branch._id, serviceId: service._id, status: "Waiting" };
+
+      const peopleAhead = await Token.countDocuments(queueWaitFilter);
 
       const token = new Token({
         tenantType: resolvedTenantType,
         organizationId: finalOrganizationId,
         branchId: branch._id,
-        serviceId: service._id,
+        serviceId: ward ? null : service._id,
+        wardId: ward ? ward._id : null,
         organizationName: finalOrganizationName,
         branchName: finalBranchName,
         serviceName: finalServiceName,
-        // Legacy string fields retained for migration compatibility.
         organization: finalOrganizationName,
         branch: finalBranchName,
         service: finalServiceName,
         fullName: normalize(fullName),
         mobile: normalize(mobile),
         note: normalize(note),
-        userId: userId || req.user?.id || null,
+        userId: resolvedUserId,
         tokenPrefix,
         tokenNumber,
         sequenceNumber,
@@ -301,15 +375,14 @@ export const createToken = async (req, res) => {
 
       try {
         createdToken = await token.save();
-        // tokenController.js -> createToken function එක ඇතුළත
         await createNotification({
           tenantType: resolvedTenantType,
-          tokenNumber: tokenNumber,
+          tokenNumber,
           title: "Token Generated",
           message: `Your token ${tokenNumber} for ${finalServiceName} at ${finalBranchName} has been successfully generated.`,
           type: "token",
-          module: resolvedTenantType, // bank, police, etc.
-          userId: token.userId || req.user?.id
+          module: resolvedTenantType,
+          userId: token.userId || req.user?.id || req.user?._id,
         });
         break;
       } catch (saveError) {

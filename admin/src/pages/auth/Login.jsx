@@ -9,6 +9,7 @@ const LOGIN_TYPES = {
   POLICE_SUPER_ADMIN: "police_super_admin",
   HOSPITAL_SUPER_ADMIN: "hospital_super_admin",
   COMPANY_SUPER_ADMIN: "company_super_admin",
+  BANK_SUPER_ADMIN: "bank_super_admin",
   ORGANIZATION_ADMIN: "organization_admin",
   BRANCH_ADMIN: "branch_admin",
   STAFF: "staff",
@@ -44,6 +45,15 @@ const DUMMY_USERS = {
     organizationId: "org_company_001",
   },
   
+  // Bank Super Admin - /bank-login
+  "bankadmin@gmail.com": {
+    password: "123456",
+    name: "Bank Super Admin",
+    role: "company_super_admin",
+    tenantType: "bank",
+    organizationId: "org_bank_001",
+  },
+
   // Shared organization-admin panel - bank tenant - /admin-login
   "bankorg@gmail.com": {
     password: "123456",
@@ -120,6 +130,11 @@ const LOGIN_CONFIG = {
     subtitle: "Manage companies and organizations",
     subtitle2: "Demo: companyadmin@gmail.com / 123456",
   },
+  [LOGIN_TYPES.BANK_SUPER_ADMIN]: {
+    title: "Bank Super Admin Login",
+    subtitle: "Manage bank branches, counters, and services",
+    subtitle2: "Demo: bankadmin@gmail.com / 123456",
+  },
   [LOGIN_TYPES.ORGANIZATION_ADMIN]: {
     title: "Organization Admin Login",
     subtitle: "Shared organization admin access for all tenants",
@@ -149,6 +164,7 @@ const ALLOWED_ROLES_BY_LOGIN_TYPE = {
   [LOGIN_TYPES.ORGANIZATION_ADMIN]: ["organization_admin"],
   [LOGIN_TYPES.BRANCH_ADMIN]: ["branch_admin"],
   [LOGIN_TYPES.STAFF]: ["staff"],
+  [LOGIN_TYPES.BANK_SUPER_ADMIN]: ["company_super_admin"],
   [LOGIN_TYPES.DEFAULT]: [],
 };
 
@@ -244,14 +260,9 @@ export default function Login({ loginType = LOGIN_TYPES.DEFAULT }) {
         status: user.status,
       });
 
-      // redirect based on role
-      if (['police_super_admin', 'hospital_super_admin', 'company_super_admin'].includes(user.role)) {
-        navigate('/admin/industry-types', { replace: true });
-      } else if (user.role === 'organization_admin') {
-        navigate('/organization-admin/branches', { replace: true });
-      } else {
-        navigate(getDefaultDashboardPath(user.role), { replace: true });
-      }
+      // Redirect to the URL provided by the backend
+      const redirectUrl = response.redirectUrl || getDefaultDashboardPath(user.role);
+      navigate(redirectUrl, { replace: true });
 
     } catch (error) {
       console.error(error);

@@ -11,7 +11,14 @@ export const normalizeTenantType = (value) => {
   return ["police", "hospital", "bank", "supermarket"].includes(tenantType) ? tenantType : tenantType;
 };
 
-export const normalizeRole = (value) => normalizeText(value);
+export const normalizeRole = (value) => {
+  const role = normalizeText(value);
+  // industry_admin is the canonical name for per-industry org admins; treat as organization_admin for RBAC.
+  if (role === "industry_admin") {
+    return "organization_admin";
+  }
+  return role;
+};
 
 export const isSuperAdmin = (user) => {
   const role = normalizeRole(user?.role);

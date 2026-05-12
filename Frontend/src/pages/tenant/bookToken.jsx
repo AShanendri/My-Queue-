@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
 import Button from "../../components/common/Button";
 import PageHeader from "../../components/common/PageHeader";
@@ -7,21 +7,10 @@ import { useTenant } from "../../context/TenantContext";
 import { clearQueueToken, createQueueToken } from "../../services/queueService";
 import { legacyStorageKeys, readValue, storageKeys } from "../../utils/storage";
 
-export default function BookToken() { // <-- මෙතනින් function එක පටන් ගන්න
+export default function BookToken() {
   const { tenantType, tenant, theme, selectedBranch, selectedService } = useTenant();
   const navigate = useNavigate();
-  const location = useLocation();
   const canGenerateToken = Boolean(selectedBranch?.id && selectedService?.id);
-
-  // Auth check
-  const token = localStorage.getItem("token");
-  const user = localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : null;
-
-  useEffect(() => {
-    if (!token) {
-      navigate("/user/login", { state: { from: location.pathname } });
-    }
-  }, [token, navigate, location.pathname]);
 
   const scopedOrganization = readValue(
     localStorage,
@@ -80,10 +69,7 @@ export default function BookToken() { // <-- මෙතනින් function එ�
       return;
     }
 
-    if (!token || !user) {
-      navigate("/user/login", { state: { from: location.pathname } });
-      return;
-    }
+    const storedUser = localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : null;
 
     // Validate mobile: must start with '07' and be exactly 10 chars (07 + 8 digits)
     if (!formData.mobile || !String(formData.mobile).startsWith("07") || String(formData.mobile).length !== 10) {
@@ -99,11 +85,11 @@ export default function BookToken() { // <-- මෙතනින් function එ�
         tenantType,
         organization: selectedOrganization,
         branchId: selectedBranch.id,
-        serviceId: selectedService.id,
+        wardId: selectedService.id,
         fullName: formData.fullName,
         mobile: formData.mobile,
         note: formData.note,
-        userId: user?._id || user?.id,
+        userId: storedUser?._id || storedUser?.id,
       });
       setGeneratedTokenData(tokenData);
       setShowQr(false);

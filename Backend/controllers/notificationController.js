@@ -3,6 +3,10 @@ import Notification from "../models/Notification.js";
 // Notification එකක් create කරන පොදු function එක
 export const createNotification = async ({ tenantType, tokenNumber, title, message, type, module, userId }) => {
   try {
+    if (!userId) {
+      return;
+    }
+
     const newNotification = new Notification({
       tenantType,
       tokenNumber,

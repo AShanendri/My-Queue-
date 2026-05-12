@@ -2,7 +2,10 @@ const SHARED_ORGANIZATION_TENANTS = new Set(["bank", "supermarket", "hospital"])
 
 const normalizeTenantType = (tenantType = "") => String(tenantType).trim().toLowerCase();
 
-export const isOrganizationAdmin = (user) => String(user?.role || "").trim().toLowerCase() === "organization_admin";
+export const isOrganizationAdmin = (user) => {
+  const role = String(user?.role || "").trim().toLowerCase();
+  return role === "organization_admin" || role === "industry_admin";
+};
 
 export const getTenantIsolationFilter = (user) => {
   if (!isOrganizationAdmin(user)) {

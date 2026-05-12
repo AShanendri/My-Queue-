@@ -32,7 +32,7 @@ export const roleHierarchy = {
   },
   [CANONICAL_ROLES.ORGANIZATION_ADMIN]: {
     label: "Organization Admin",
-    dashboardPath: "/admin/dashboard",
+    dashboardPath: "/organization-admin/branches",
     canManageOrganizations: false,
     canManageBranches: true,
     canCreateBranchAdmins: true,

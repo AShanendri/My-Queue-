@@ -23,6 +23,12 @@ const tokenSchema = new mongoose.Schema({
     default: null,
     index: true,
   },
+  wardId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Ward",
+    default: null,
+    index: true,
+  },
   organizationName: {
     type: String,
     default: "",
@@ -68,7 +74,7 @@ const tokenSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true,
+    default: null,
     index: true,
   },
   note: {
@@ -157,6 +163,22 @@ tokenSchema.index(
       organizationId: { $type: "objectId" },
       branchId: { $type: "objectId" },
       serviceId: { $type: "objectId" },
+    },
+  }
+);
+
+tokenSchema.index(
+  {
+    tenantType: 1,
+    branchId: 1,
+    wardId: 1,
+    sequenceNumber: 1,
+  },
+  {
+    unique: true,
+    partialFilterExpression: {
+      branchId: { $type: "objectId" },
+      wardId: { $type: "objectId" },
     },
   }
 );

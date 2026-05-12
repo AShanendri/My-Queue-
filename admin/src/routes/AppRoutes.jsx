@@ -78,6 +78,7 @@ export default function AppRoutes() {
       <Route path="/police-login" element={<Login loginType="police_super_admin" />} />
       <Route path="/hospital-login" element={<Login loginType="hospital_super_admin" />} />
       <Route path="/company-login" element={<Login loginType="company_super_admin" />} />
+      <Route path="/bank-login" element={<Login loginType="bank_super_admin" />} />
       <Route path="/admin-login" element={<Login loginType="organization_admin" />} />
       <Route path="/branch-login" element={<Login loginType="branch_admin" />} />
       <Route path="/staff-login" element={<Login loginType="staff" />} />
@@ -93,7 +94,12 @@ export default function AppRoutes() {
         <Route
           path="/admin/dashboard"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={[
+              CANONICAL_ROLES.COMPANY_SUPER_ADMIN,
+              CANONICAL_ROLES.HOSPITAL_SUPER_ADMIN,
+              CANONICAL_ROLES.POLICE_SUPER_ADMIN,
+              CANONICAL_ROLES.ORGANIZATION_ADMIN,
+            ]}>
               <DynamicAdminDashboard />
             </ProtectedRoute>
           }

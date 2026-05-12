@@ -13,6 +13,15 @@ export const TenantProvider = ({ tenantType, children }) => {
 
   const selectedOrganizationIdKey = useMemo(() => `queueflow_${tenantType}_selectedOrganization_id`, [tenantType]);
 
+  const readSelectedIndustryTypeId = useCallback(() => {
+    const savedCode = String(localStorage.getItem("queueflow_selectedIndustryCode") || "").trim().toLowerCase();
+    const tt = String(tenantType || "").trim().toLowerCase();
+    if (!savedCode || !tt || savedCode !== tt) {
+      return "";
+    }
+    return String(localStorage.getItem("queueflow_selectedIndustryTypeId") || "").trim();
+  }, [tenantType]);
+
   const readSelectedOrganization = useCallback(() =>
     readValue(localStorage, storageKeys.selectedOrganization(tenantType), [legacyStorageKeys.selectedOrganization]) || "", [tenantType]);
 
@@ -62,6 +71,7 @@ export const TenantProvider = ({ tenantType, children }) => {
   const [selectedService, setSelectedServiceState] = useState(() => readSelectedService());
   const [selectedOrganization, setSelectedOrganizationState] = useState(() => readSelectedOrganization());
   const [selectedOrganizationId, setSelectedOrganizationIdState] = useState(() => readSelectedOrganizationId());
+  const [selectedIndustryTypeId, setSelectedIndustryTypeIdState] = useState(() => readSelectedIndustryTypeId());
 
   // Update state when tenantType changes
   useEffect(() => {
@@ -69,16 +79,16 @@ export const TenantProvider = ({ tenantType, children }) => {
     const newService = readSelectedService();
     const newOrganization = readSelectedOrganization();
     const newOrganizationId = readSelectedOrganizationId();
+    const newIndustryTypeId = readSelectedIndustryTypeId();
 
     setSelectedBranchState(newBranch);
     setSelectedServiceState(newService);
     setSelectedOrganizationState(newOrganization);
     setSelectedOrganizationIdState(newOrganizationId);
-  }, [tenantType, readSelectedBranch, readSelectedService, readSelectedOrganization, readSelectedOrganizationId]);
+    setSelectedIndustryTypeIdState(newIndustryTypeId);
+  }, [tenantType, readSelectedBranch, readSelectedService, readSelectedOrganization, readSelectedOrganizationId, readSelectedIndustryTypeId]);
 
-
-
-const setSelectedOrganization = useCallback((organizationName, organizationId = "") => {
+  const setSelectedOrganization = useCallback((organizationName, organizationId = "") => {
     const normalizedName = String(organizationName || "").trim();
     const normalizedId = String(organizationId || "").trim();
 
@@ -103,9 +113,23 @@ const setSelectedOrganization = useCallback((organizationName, organizationId = 
     localStorage.setItem(orgNameKey, normalizedName);
     localStorage.setItem(orgIdKey, normalizedId);
     localStorage.setItem(`queueflow_selectedTenant`, activeTenant);
-
-    console.log(`Saved for ${activeTenant}:`, normalizedId);
   }, [tenantType]);
+
+  const setSelectedIndustry = useCallback((industryTypeId, industryCode) => {
+    const id = String(industryTypeId || "").trim();
+    const code = String(industryCode || "").trim().toLowerCase();
+    setSelectedIndustryTypeIdState(id);
+    if (id) {
+      localStorage.setItem("queueflow_selectedIndustryTypeId", id);
+    } else {
+      localStorage.removeItem("queueflow_selectedIndustryTypeId");
+    }
+    if (code) {
+      localStorage.setItem("queueflow_selectedIndustryCode", code);
+    } else {
+      localStorage.removeItem("queueflow_selectedIndustryCode");
+    }
+  }, []);
 
   const setSelectedBranch = useCallback((branch) => {
     setSelectedBranchState(branch);
@@ -144,6 +168,9 @@ const setSelectedOrganization = useCallback((organizationName, organizationId = 
     removeItem(localStorage, legacyStorageKeys.selectedOrganization);
     removeItem(localStorage, legacyStorageKeys.selectedBranch);
     removeItem(localStorage, legacyStorageKeys.selectedService);
+    removeItem(localStorage, "queueflow_selectedIndustryTypeId");
+    removeItem(localStorage, "queueflow_selectedIndustryCode");
+    setSelectedIndustryTypeIdState("");
   }, [tenantType, selectedOrganizationIdKey]);
 
   const value = useMemo(
@@ -153,9 +180,11 @@ const setSelectedOrganization = useCallback((organizationName, organizationId = 
       theme,
       selectedOrganization,
       selectedOrganizationId,
+      selectedIndustryTypeId,
       selectedBranch,
       selectedService,
       setSelectedOrganization,
+      setSelectedIndustry,
       setSelectedBranch,
       setSelectedService,
       clearSelection,
@@ -166,9 +195,11 @@ const setSelectedOrganization = useCallback((organizationName, organizationId = 
       theme,
       selectedOrganization,
       selectedOrganizationId,
+      selectedIndustryTypeId,
       selectedBranch,
       selectedService,
       setSelectedOrganization,
+      setSelectedIndustry,
       setSelectedBranch,
       setSelectedService,
       clearSelection,

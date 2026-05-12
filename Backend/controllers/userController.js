@@ -9,6 +9,7 @@ import {
   isBranchAdmin,
   isOrganizationAdmin,
   isSuperAdmin,
+  isStaff,
   normalizeRole,
   normalizeTenantType,
 } from "../utils/scopeHelpers.js";
@@ -38,6 +39,78 @@ const REGISTRATION_ALLOWED_DB_ROLES = new Set([
 
 const normalizeText = (value = "") => String(value || "").trim();
 const normalizeEmail = (value = "") => normalizeText(value).toLowerCase();
+
+const getRedirectUrlForUser = (userPayload) => {
+  if (!userPayload || !userPayload.role) {
+    return "/login";
+  }
+
+  const role = normalizeRole(userPayload.role);
+  const tenantType = normalizeTenantType(userPayload.tenantType);
+
+  // Super admin - goes to main admin dashboard
+  if (role === "super_admin") {
+    return "/admin-dashboard";
+  }
+
+  // Industry super admins
+  if (role === "police_super_admin") {
+    return "/admin/dashboard";
+  }
+
+  if (role === "hospital_super_admin") {
+    return "/admin/dashboard";
+  }
+
+  if (role === "company_super_admin") {
+    return "/admin/dashboard";
+  }
+
+  // Organization admin - tenant-scoped branch management
+  if (role === "organization_admin") {
+    if (tenantType === "police") {
+      return "/police-admin/branches";
+    } else if (tenantType === "hospital") {
+      return "/hospital-admin/branches";
+    } else if (tenantType === "bank") {
+      return "/bank-admin/branches";
+    } else if (tenantType === "supermarket") {
+      return "/supermarket-admin/branches";
+    }
+    return "/admin/branches";
+  }
+
+  // Branch admin - branch-level management
+  if (role === "branch_admin") {
+    if (tenantType === "police") {
+      return "/police-branch/dashboard";
+    } else if (tenantType === "hospital") {
+      return "/hospital-branch/dashboard";
+    } else if (tenantType === "bank") {
+      return "/bank-branch/dashboard";
+    } else if (tenantType === "supermarket") {
+      return "/supermarket-branch/dashboard";
+    }
+    return "/branch/dashboard";
+  }
+
+  // Staff - staff dashboard
+  if (role === "staff") {
+    if (tenantType === "police") {
+      return "/police-staff/dashboard";
+    } else if (tenantType === "hospital") {
+      return "/hospital-staff/dashboard";
+    } else if (tenantType === "bank") {
+      return "/bank-staff/dashboard";
+    } else if (tenantType === "supermarket") {
+      return "/supermarket-staff/dashboard";
+    }
+    return "/staff/dashboard";
+  }
+
+  // Default fallback
+  return "/dashboard";
+};
 
 const buildUserResponse = (user) => ({
   id: String(user._id || user.id || ""),
@@ -566,10 +639,12 @@ export const loginUser = async (req, res) => {
       };
 
       const token = jwt.sign(userPayload, jwtSecret, { expiresIn: "7d" });
+      const redirectUrl = getRedirectUrlForUser(userPayload);
 
       return successResponse(res, 200, "Login successful", {
         token,
         user: userPayload,
+        redirectUrl,
       });
     }
 
@@ -597,10 +672,12 @@ export const loginUser = async (req, res) => {
     };
 
     const token = jwt.sign(userPayload, jwtSecret, { expiresIn: "7d" });
+    const redirectUrl = getRedirectUrlForUser(userPayload);
 
     return successResponse(res, 200, "Login successful", {
       token,
       user: userPayload,
+      redirectUrl,
     });
   } catch (error) {
     console.error("loginUser error:", error);

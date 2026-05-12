@@ -2,6 +2,7 @@ import User from "../models/User.js";
 import Organization from "../models/Organization.js";
 import Branch from "../models/Branch.js";
 import Service from "../models/Service.js";
+import { isOrganizationAdmin } from "../utils/scopeHelpers.js";
 
 /**
  * Get organization admin dashboard counts.
@@ -96,8 +97,7 @@ export const getOrganizationBranchAdminsGrouped = async (req, res) => {
       });
     }
 
-    const role = String(req.user.role || "").trim().toLowerCase();
-    if (role !== "organization_admin") {
+    if (!isOrganizationAdmin(req.user)) {
       return res.status(403).json({
         success: false,
         message: "Only organization_admin can access branch admins",
@@ -199,8 +199,7 @@ export const addOrganizationBranchService = async (req, res) => {
       return res.status(401).json({ success: false, message: "User authentication required" });
     }
 
-    const role = String(req.user.role || "").trim().toLowerCase();
-    if (role !== "organization_admin") {
+    if (!isOrganizationAdmin(req.user)) {
       return res.status(403).json({ success: false, message: "Only organization_admin can add branch services" });
     }
 
@@ -320,8 +319,7 @@ export const getOrganizationBranchServices = async (req, res) => {
       });
     }
 
-    const role = String(req.user.role || "").trim().toLowerCase();
-    if (role !== "organization_admin") {
+    if (!isOrganizationAdmin(req.user)) {
       return res.status(403).json({
         success: false,
         message: "Only organization_admin can access branch services",

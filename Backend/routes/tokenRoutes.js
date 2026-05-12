@@ -14,8 +14,8 @@ tokenrouter.get("/waiting-count", authMiddleware, getWaitingTokenCount);
 tokenrouter.get("/processed-history", authMiddleware, getProcessedTokensByCounter);
 tokenrouter.get("/track/:tokenNumber", trackTokenByNumber);
 
-// Create, update, and generic get must be after specific routes
-tokenrouter.post("/", authMiddleware, createToken);
+// Create: public for kiosk / anonymous customers (validates branch + ward/service scope in controller)
+tokenrouter.post("/", createToken);
 tokenrouter.patch("/:id/status", updateTokenStatus);
 
 // Generic routes last (most general pattern)

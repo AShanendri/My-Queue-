@@ -176,7 +176,7 @@ export const getWardsForBranch = async (branchId) => {
   }
 
   try {
-    const { data } = await client.get(`/branches/${normalizedBranchId}/wards`);
+    const { data } = await client.get(`/branches/wards/public/${encodeURIComponent(normalizedBranchId)}`);
 
     return Array.isArray(data?.wards)
       ? data.wards.map((ward) => ({

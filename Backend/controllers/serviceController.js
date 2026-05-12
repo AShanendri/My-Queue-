@@ -309,6 +309,44 @@ export const getBranchServices = async (req, res) => {
   }
 };
 
+/** Active branch services for customer booking UI (no auth). */
+export const getPublicBranchServices = async (req, res) => {
+  try {
+    const { branchId } = req.params;
+    if (!isValidObjectId(branchId)) {
+      return errorResponse(res, 400, "Invalid branchId");
+    }
+
+    const branch = await Branch.findById(branchId)
+      .select("_id tenantType organizationId organizationName divisionId divisionName branchName status")
+      .lean();
+
+    if (!branch || String(branch.status || "").toLowerCase() !== "active") {
+      return errorResponse(res, 404, "Branch not found");
+    }
+
+    const services = await Service.find({
+      branchIds: { $in: [branch._id] },
+      status: "active",
+    }).sort({ createdAt: -1 });
+
+    return successResponse(res, 200, "Branch services fetched successfully", {
+      branch: {
+        id: branch._id,
+        branchName: branch.branchName,
+        tenantType: branch.tenantType,
+      },
+      count: services.length,
+      services: services.map(buildServiceResponse),
+    });
+  } catch (error) {
+    console.error("getPublicBranchServices error:", error);
+    return errorResponse(res, 500, "Server error while fetching branch services", {
+      error: error?.message || error,
+    });
+  }
+};
+
 export const updateService = async (req, res) => {
   try {
     if (!req.user) {

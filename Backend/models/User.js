@@ -38,7 +38,9 @@ const userSchema = new mongoose.Schema(
       enum: [
         "user",
         "customer",
+        "super_admin",
         "organization_admin",
+        "industry_admin",
         "branch_admin",
         "staff",
         "hospital_super_admin",
@@ -53,11 +55,13 @@ const userSchema = new mongoose.Schema(
 
     tenantType: {
       type: String,
+      enum: ["police", "hospital", "bank", "supermarket", "company"],
       default: null,
       trim: true,
       lowercase: true,
       required: function () {
-        return this.role === "staff";
+        const role = String(this.role || "").trim().toLowerCase();
+        return !["user", "customer"].includes(role);
       },
     },
 
@@ -65,11 +69,8 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       default: null,
       required: function () {
-        if (this.role !== "staff") {
-          return false;
-        }
-
-        return Boolean(String(this.tenantType || "").trim());
+        const role = String(this.role || "").trim().toLowerCase();
+        return ["organization_admin", "industry_admin", "branch_admin", "staff"].includes(role);
       },
     },
 
@@ -98,7 +99,8 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       default: null,
       required: function () {
-        return this.role === "staff";
+        const role = String(this.role || "").trim().toLowerCase();
+        return ["branch_admin", "staff"].includes(role);
       },
     },
 
@@ -107,7 +109,8 @@ const userSchema = new mongoose.Schema(
       default: null,
       trim: true,
       required: function () {
-        return this.role === "staff";
+        const role = String(this.role || "").trim().toLowerCase();
+        return ["branch_admin", "staff"].includes(role);
       },
     },
 

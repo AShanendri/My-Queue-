@@ -103,6 +103,19 @@ export default function SharedOrganizationAdminBranches() {
     }
   };
 
+  const handleDeleteWard = async (wardId) => {
+    const id = wardId || "";
+    if (!id || !window.confirm("Delete this ward/counter?")) return;
+
+    setWardError(null);
+    try {
+      await api.delete(`/branches/wards/${id}`);
+      setWards((prev) => prev.filter((w) => String(w._id || w.id) !== String(id)));
+    } catch (err) {
+      setWardError(err?.response?.data?.message || "Failed to delete ward");
+    }
+  };
+
   const formatStatusLabel = (status) => status?.charAt(0).toUpperCase() + status?.slice(1);
   const formatCreatedAt = (dateValue) => {
     if (!dateValue) return "-";
@@ -262,14 +275,23 @@ export default function SharedOrganizationAdminBranches() {
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-slate-900">Existing Wards</h3>
               {wards.map((ward) => (
-                <div key={ward.id} className="flex items-start justify-between rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div key={ward._id || ward.id} className="flex items-start justify-between rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <div>
                     <p className="font-medium text-slate-900">{ward.name}</p>
                     {ward.description && <p className="text-sm text-slate-600">{ward.description}</p>}
                   </div>
-                  <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
-                    {ward.status || "active"}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
+                      {ward.status || "active"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteWard(ward._id || ward.id)}
+                      className="rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

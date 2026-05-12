@@ -8,7 +8,8 @@ import {
 
 const industryTypeRouter = express.Router();
 
-industryTypeRouter.get("/", authMiddleware, getIndustryTypes);
+// Public list for customer home & kiosk flows (no JWT required)
+industryTypeRouter.get("/", getIndustryTypes);
 industryTypeRouter.post("/", authMiddleware, createIndustryType);
 industryTypeRouter.delete("/:id", authMiddleware, deleteIndustryType);
 
